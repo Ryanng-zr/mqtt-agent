@@ -91,3 +91,4 @@ dmypy.json
 # -------------------------
 # Other environment/system files
 # -------------
+.env
