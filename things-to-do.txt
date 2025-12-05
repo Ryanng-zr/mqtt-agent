@@ -1,0 +1,78 @@
+[Task] Handing of MQTT Topics upon receiving of SUB
+
+Key Features:
+1. How to handle agent action upon receiving MQ message event
+2. How to handle user specific actions. (i.e. 1 backend has to know and process the different actions for each user)
+
+
+
+
+
+
+things to do:
+
+- YAML format
+- 
+
+Goals: understand what to achieve, format 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+AI orchestrator 
+-> on message received 
+
+-> LLM chooses what actions to do 
+
+-> depending on different user 
+
+
+
+
+
+
+
+
+
+CHECKPOINTS:
+1. Set up mqtt topic, start publishing messages
+2. Messages should contain JSON with certain fields, perform JSON mapping/validation 
+3. Depending on the JSON fields, choose agent? then within agent choose tools
+4. Tool should constitute an API call to a backend
+5. A&A will be done by backend
+6. Per-user state to be stored 
+
+
+monitor + execute
+monitor + inform
+monitor
+execute
