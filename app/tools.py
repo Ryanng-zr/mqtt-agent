@@ -2,7 +2,7 @@ import requests
 from typing import Dict, Any, Callable
 import os
 
-BACKEND_BASE_URL = os.environ.get("BACKEND_BASE_URL", "https://demo.purposes")
+BACKEND_BASE_URL = os.environ.get("BACKEND_BASE_URL", "http://localhost:5001/demo")
 COMMON_HEADERS = {"X-Service-Name": "mqtt-agent"}
 
 
@@ -11,15 +11,16 @@ def check_sensor_gap_tool(user_id: str, incident_id: str) -> Dict[str, Any]:
     Check sensor coverage and detect any sensor gaps in breach scenarios and user.
     Use this when you need to assess how well sensors cover an incident.
     """
-    url = f"{BACKEND_BASE_URL}/post"
+    url = f"{BACKEND_BASE_URL}"
     payload = {
         "userId": user_id,
         "incidentId": incident_id,
         # "correlationId": correlation_id,
     }
     print(f"[TOOL] check_sensor_gap_tool -> {url} {payload}")
-    resp = requests.post(url, json=payload, headers=COMMON_HEADERS, timeout=10)
+    resp = requests.get(url, json=payload, headers=COMMON_HEADERS, timeout=10)
     resp.raise_for_status()
+    print(f"[TOOL] check_sensor_gap_tool called")
     return resp.json()
 
 
@@ -27,7 +28,7 @@ def call_dss_tool(user_id: str, scenario: str) -> Dict[str, Any]:
     """
     Run DSS for a given user and in breach scenario to perform a set of actions.
     """
-    url = f"{BACKEND_BASE_URL}/post"
+    url = f"{BACKEND_BASE_URL}"
     payload = {
         "userId": user_id,
         "scenario": scenario,
@@ -35,8 +36,9 @@ def call_dss_tool(user_id: str, scenario: str) -> Dict[str, Any]:
         # "correlationId": correlation_id,
     }
     print(f"[TOOL] call_dss_tool -> {url} {payload}")
-    resp = requests.post(url, json=payload, headers=COMMON_HEADERS, timeout=10)
+    resp = requests.get(url, json=payload, headers=COMMON_HEADERS, timeout=10)
     resp.raise_for_status()
+    print(f"[TOOL] call_dss_tool called")
     return resp.json()
 
 
@@ -45,15 +47,16 @@ def notify_tool(user_id: str, message: str) -> Dict[str, Any]:
     Send a notification or log entry associated with a specific user.
     Use this when you need to log or notify about what was done.
     """
-    url = f"{BACKEND_BASE_URL}/post"
+    url = f"{BACKEND_BASE_URL}"
     payload = {
         "userId": user_id,
         # "correlationId": correlation_id,
         "message": message,
     }
     print(f"[TOOL] notify_tool -> {url} {payload}")
-    resp = requests.post(url, json=payload, headers=COMMON_HEADERS, timeout=10)
+    resp = requests.get(url, json=payload, headers=COMMON_HEADERS, timeout=10)
     resp.raise_for_status()
+    print(f"[TOOL] notify_tool called")
     return resp.json()
 
 

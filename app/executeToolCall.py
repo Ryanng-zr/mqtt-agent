@@ -2,7 +2,8 @@ import json
 from typing import Any, Dict, List
 
 from langchain_core.messages import HumanMessage, SystemMessage
-from langgraph.prebuilt import create_agent
+from langchain_core.tools import tool
+from langchain.agents import create_agent
 
 from helper import extract_json_object
 from llm import llm
@@ -17,10 +18,17 @@ from tools import (
 
 # LangChain tool wrappers so LangGraph can route tool calls automatically
 def _wrap_tool(fn, *, name: str, description: str):
-    from langchain_core.tools import tool
 
-    @tool(name=name, description=description)
+    @tool(name, description=description)
     def _inner(**kwargs):
+        # LangGraph sometimes wraps tool arguments under a top-level "kwargs"
+        # key when passing them through callbacks. Normalize this so our
+        # underlying tool functions (which expect explicit keyword args) keep
+        # working even if a nested dict is provided.
+        if "kwargs" in kwargs and isinstance(kwargs["kwargs"], dict):
+            nested = kwargs.pop("kwargs")
+            kwargs.update(nested)
+
         return fn(**kwargs)
 
     return _inner
