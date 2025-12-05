@@ -1,0 +1,93 @@
+# -------------------------
+# Python cache & compiled files
+# -------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+*.pyd
+*.dll
+
+# -------------------------
+# Virtual Environments
+# -------------------------
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# -------------------------
+# VSCode settings
+# -------------------------
+.vscode/
+.settings/
+
+# -------------------------
+# Logs & temp files
+# -------------------------
+*.log
+*.tmp
+*.swp
+*.swo
+
+# -------------------------
+# Byte-compiled & package builds
+# -------------------------
+build/
+dist/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+var/
+sdist/
+*.egg
+*.egg-info/
+.installed.cfg
+*.manifest
+*.spec
+
+# -------------------------
+# Jupyter Notebook
+# -------------------------
+.ipynb_checkpoints/
+
+# -------------------------
+# PyInstaller
+# -------------------------
+*.manifest
+*.spec
+
+# -------------------------
+# Test & coverage files
+# -------------------------
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# -------------------------
+# MyPy & Pyre
+# -------------------------
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+
+# -------------------------
+# Other environment/system files
+# -------------
