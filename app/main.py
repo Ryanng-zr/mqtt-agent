@@ -22,10 +22,12 @@ GOALS = [
     "Monitor tracks and notify me",
 ]
 
+
 def on_connect(client, userdata, flags, reason_code, properties=None):
     print(f"[MQTT] Connected to broker: {reason_code}")
     print(f"[MQTT] Subscribing to topic: {MQTT_TOPIC_AIR_TRACKS}")
     client.subscribe(MQTT_TOPIC_AIR_TRACKS, qos=1)
+
 
 def on_message(client, userdata, msg):
     raw = msg.payload.decode("utf-8", errors="replace")
@@ -44,7 +46,6 @@ def on_message(client, userdata, msg):
         print(f"[MQTT] Payload does not match BaseMessage schema: {e}")
         return
 
-    # Decide which candidate goals to use for this topic
     candidate_goals = GOALS
 
     try:

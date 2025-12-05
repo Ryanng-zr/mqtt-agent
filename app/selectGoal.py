@@ -5,7 +5,10 @@ from llm import llm
 from mqttPayloadSchema import BaseMessage
 from helper import extract_json_object
 
-def select_best_goal_for_message(base_msg: BaseMessage, candidate_goals: List[str]) -> List[str]:
+
+def select_best_goal_for_message(
+    base_msg: BaseMessage, candidate_goals: List[str]
+) -> List[str]:
     """
     Given a message payload and a list of candidate goals (strings),
     ask Gemini to choose zero, one, or multiple matching goals.
@@ -17,7 +20,6 @@ def select_best_goal_for_message(base_msg: BaseMessage, candidate_goals: List[st
         "type": base_msg.type,
         "action": base_msg.action,
         "userId": base_msg.userId,
-        # "correlationId": base_msg.correlationId,
         "data": base_msg.data,
     }
 
@@ -35,12 +37,14 @@ def select_best_goal_for_message(base_msg: BaseMessage, candidate_goals: List[st
         "=== CANDIDATE GOALS ===\n"
         f"{json.dumps(candidate_goals, indent=2)}\n\n"
         "Respond with ONLY a JSON object such as:"
-        " { \"chosen_goals\": [\"goal_a\", \"goal_b\"] }"
+        ' { "chosen_goals": ["goal_a", "goal_b"] }'
     )
 
     print("[AGENT] Asking model to select best goal(s)...")
     response = llm.invoke(prompt)
-    text = response.content if isinstance(response.content, str) else str(response.content)
+    text = (
+        response.content if isinstance(response.content, str) else str(response.content)
+    )
     print("[AGENT] Goal selection raw response:")
     print(text)
 
@@ -81,13 +85,20 @@ def classify_goal_mode(goal: str) -> str:
     )
 
     response = llm.invoke(prompt)
-    mode = (response.content if isinstance(response.content, str) else str(response.content)).strip().upper()
+    mode = (
+        (
+            response.content
+            if isinstance(response.content, str)
+            else str(response.content)
+        )
+        .strip()
+        .upper()
+    )
 
     valid = {"MONITOR", "EXECUTE", "MONITOR_EXECUTE", "MONITOR_INFORM"}
     if mode not in valid:
         print(f"[AGENT] Invalid mode '{mode}', defaulting to MONITOR.")
         return "MONITOR"
-
     return mode
 
 

@@ -19,6 +19,7 @@ import json
 import json
 from typing import Any, Dict
 
+
 def extract_json_object(text: str) -> Dict[str, Any]:
     """
     Extract a JSON object from an LLM response.
@@ -36,7 +37,7 @@ def extract_json_object(text: str) -> Dict[str, Any]:
     if fence_start != -1:
         fence_end = text.find("```", fence_start + 7)
         if fence_end != -1:
-            json_block = text[fence_start + len("```json"):fence_end].strip()
+            json_block = text[fence_start + len("```json") : fence_end].strip()
             try:
                 return json.loads(json_block)
             except json.JSONDecodeError as e:
@@ -49,7 +50,7 @@ def extract_json_object(text: str) -> Dict[str, Any]:
     if fence_start != -1:
         fence_end = text.find("```", fence_start + 3)
         if fence_end != -1:
-            json_block = text[fence_start + 3:fence_end].strip()
+            json_block = text[fence_start + 3 : fence_end].strip()
             try:
                 return json.loads(json_block)
             except json.JSONDecodeError as e:
@@ -60,7 +61,7 @@ def extract_json_object(text: str) -> Dict[str, Any]:
     first_brace = text.find("{")
     last_brace = text.rfind("}")
     if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
-        candidate = text[first_brace:last_brace + 1]
+        candidate = text[first_brace : last_brace + 1]
         try:
             return json.loads(candidate)
         except json.JSONDecodeError:

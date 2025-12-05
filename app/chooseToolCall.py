@@ -6,6 +6,7 @@ from llm import llm
 from mqttPayloadSchema import BaseMessage
 from tools import TOOLS
 
+
 def plan_tool_calls_with_gemini(
     base_msg: BaseMessage, goal_modes: Dict[str, str], chosen_goals: List[str]
 ) -> List[Dict[str, Any]]:
@@ -20,13 +21,11 @@ def plan_tool_calls_with_gemini(
         "type": base_msg.type,
         "action": base_msg.action,
         "userId": base_msg.userId,
-        # "correlationId": base_msg.correlationId,
         "data": base_msg.data,
     }
 
     tools_desc = [
-        {"name": t.name, "description": t.description}
-        for t in TOOLS.values()
+        {"name": t.name, "description": t.description} for t in TOOLS.values()
     ]
 
     goal_mode_explanation = {
@@ -53,12 +52,14 @@ def plan_tool_calls_with_gemini(
         "- Use multiple tools if appropriate.\n"
         "- Do not invent fields not present in the payload.\n"
         "- If required fields are missing for a tool, omit that tool.\n\n"
-        "Respond with ONLY JSON: { \"tool_calls\": [ { \"tool\": \"<tool_name>\", \"args\": { ... } } ] }"
+        'Respond with ONLY JSON: { "tool_calls": [ { "tool": "<tool_name>", "args": { ... } } ] }'
     )
 
     print("[AGENT] Asking model to plan tool calls...")
     response = llm.invoke(prompt)
-    text = response.content if isinstance(response.content, str) else str(response.content)
+    text = (
+        response.content if isinstance(response.content, str) else str(response.content)
+    )
     print("[AGENT] Gemini plan raw response:")
     print(text)
 

@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict, List
+from typing import Any, List
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.tools import tool
@@ -16,15 +16,9 @@ from tools import (
 )
 
 
-# LangChain tool wrappers so LangGraph can route tool calls automatically
 def _wrap_tool(fn, *, name: str, description: str):
-
     @tool(name, description=description)
     def _inner(**kwargs):
-        # LangGraph sometimes wraps tool arguments under a top-level "kwargs"
-        # key when passing them through callbacks. Normalize this so our
-        # underlying tool functions (which expect explicit keyword args) keep
-        # working even if a nested dict is provided.
         if "kwargs" in kwargs and isinstance(kwargs["kwargs"], dict):
             nested = kwargs.pop("kwargs")
             kwargs.update(nested)
@@ -52,7 +46,6 @@ wrapped_tools = [
     ),
 ]
 
-# Build a reusable LangGraph agent capable of tool-calling
 _agent = create_agent(llm, tools=wrapped_tools)
 
 
@@ -66,6 +59,7 @@ def _render_payload(base_msg: BaseMessage) -> str:
     return json.dumps(payload_dict, indent=2)
 
 
+# Extract Text Helper from AI Response
 def _extract_text(content: Any) -> str:
     if isinstance(content, str):
         return content
@@ -84,9 +78,13 @@ def run_agent_for_message(base_msg: BaseMessage, candidate_goals: List[str]) -> 
     if not candidate_goals:
         raise ValueError("candidate_goals must not be empty")
 
+    # Internalise the payload
     payload_str = _render_payload(base_msg)
+
+    # Internalise the candidate goals
     goals_str = json.dumps(candidate_goals, indent=2)
 
+    # Construct system message to determine GOAL SELECTION
     system_msg = SystemMessage(
         content=(
             "You are an orchestration agent that must ground every action in the "
@@ -99,6 +97,7 @@ def run_agent_for_message(base_msg: BaseMessage, candidate_goals: List[str]) -> 
         )
     )
 
+    # Add payload and goals to human message
     human_msg = HumanMessage(
         content=(
             "=== PAYLOAD ===\n"
@@ -108,7 +107,7 @@ def run_agent_for_message(base_msg: BaseMessage, candidate_goals: List[str]) -> 
             "Decide which goals to pursue (including possibly none), determine a mode for each, "
             "and call tools as needed. End with a final assistant message containing a short summary "
             "plus a JSON block with keys: chosen_goals (array), goal_modes (object mapping goal->mode), "
-            "and results (any structured data)."
+            "chosen_tools (object mapping goal->tool) and results (any structured data)."
         )
     )
 

@@ -15,7 +15,6 @@ def check_sensor_gap_tool(user_id: str, incident_id: str) -> Dict[str, Any]:
     payload = {
         "userId": user_id,
         "incidentId": incident_id,
-        # "correlationId": correlation_id,
     }
     print(f"[TOOL] check_sensor_gap_tool -> {url} {payload}")
     resp = requests.get(url, json=payload, headers=COMMON_HEADERS, timeout=10)
@@ -32,8 +31,6 @@ def call_dss_tool(user_id: str, scenario: str) -> Dict[str, Any]:
     payload = {
         "userId": user_id,
         "scenario": scenario,
-        # "maxOptions": max_options,
-        # "correlationId": correlation_id,
     }
     print(f"[TOOL] call_dss_tool -> {url} {payload}")
     resp = requests.get(url, json=payload, headers=COMMON_HEADERS, timeout=10)
@@ -50,7 +47,6 @@ def notify_tool(user_id: str, message: str) -> Dict[str, Any]:
     url = f"{BACKEND_BASE_URL}"
     payload = {
         "userId": user_id,
-        # "correlationId": correlation_id,
         "message": message,
     }
     print(f"[TOOL] notify_tool -> {url} {payload}")
