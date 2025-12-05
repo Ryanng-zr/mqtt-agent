@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Dict, Any
 
 class BaseMessage(BaseModel):
@@ -10,4 +10,4 @@ class BaseMessage(BaseModel):
     action: str            # e.g. "AIR_TRACK_UPDATE", "START_DSS"
     userId: str
     # correlationId: str
-    data: Dict[str, Any] = {}
+    data: Dict[str, Any] = Field(default_factory=dict)

@@ -1,13 +1,14 @@
-from mqttPayloadSchema import BaseMessage
-from typing import List
-from llm import llm
 import json
+from typing import List
+
+from llm import llm
+from mqttPayloadSchema import BaseMessage
 from helper import extract_json_object
 
-def select_best_goal_for_message(base_msg: BaseMessage, candidate_goals: List[str]) -> str:
+def select_best_goal_for_message(base_msg: BaseMessage, candidate_goals: List[str]) -> List[str]:
     """
     Given a message payload and a list of candidate goals (strings),
-    ask Gemini to choose the most appropriate goal or none for this message.
+    ask Gemini to choose zero, one, or multiple matching goals.
     """
     if not candidate_goals:
         raise ValueError("candidate_goals must not be empty")
@@ -20,89 +21,67 @@ def select_best_goal_for_message(base_msg: BaseMessage, candidate_goals: List[st
         "data": base_msg.data,
     }
 
-    prompt = {
-        "role": "user",
-        "parts": [
-            "You are a goal selector for a backend orchestration AI.",
-            "",
-            "You will receive:",
-            "- A JSON payload representing a message from another system.",
-            "- A list of possible goals (strings).",
-            "",
-            "Your job:",
-            "- Choose zero or more goals from the list that best matches what should be done",
-            "  for this specific payload.",
-            "- Consider both the semantics of the payload and the wording of each goal.",
-            "- If more than one seems reasonable, pick the one that is most specific.",
-            "",
-            "Important:",
-            "- If it matches none of the goals, return nothing.",
-            "- Return the goals exactly as it appears in the list.",
-            "- Do NOT modify the text.",
-            "- Do NOT invent new goals.",
-            "",
-            "=== PAYLOAD JSON ===",
-            json.dumps(payload_dict, indent=2),
-            "",
-            "=== CANDIDATE GOALS ===",
-            json.dumps(candidate_goals, indent=2),
-            "",
-            "Respond with ONLY a JSON object:",
-            '{ "chosen_goal": "<one_of_the_candidate_strings>" }',
-        ],
-    }
+    prompt = (
+        "You are a goal selector for a backend orchestration AI.\n\n"
+        "You will receive a JSON payload and a list of possible goals. Choose zero or more goals "
+        "that best match this payload. If more than one fits, include all that apply, "
+        "favoring the most specific matches.\n\n"
+        "Important rules:\n"
+        "- If none match, return an empty array.\n"
+        "- Return goals exactly as written.\n"
+        "- Do NOT invent new goals.\n\n"
+        "=== PAYLOAD JSON ===\n"
+        f"{json.dumps(payload_dict, indent=2)}\n\n"
+        "=== CANDIDATE GOALS ===\n"
+        f"{json.dumps(candidate_goals, indent=2)}\n\n"
+        "Respond with ONLY a JSON object such as:"
+        " { \"chosen_goals\": [\"goal_a\", \"goal_b\"] }"
+    )
 
-    print("[AGENT] Asking Gemini to select best goal...")
-    response = llm.generate_content(prompt)
-    text = response.text
+    print("[AGENT] Asking model to select best goal(s)...")
+    response = llm.invoke(prompt)
+    text = response.content if isinstance(response.content, str) else str(response.content)
     print("[AGENT] Goal selection raw response:")
     print(text)
 
     obj = extract_json_object(text)
-    chosen = obj.get("chosen_goal", "").strip()
+    raw_chosen = obj.get("chosen_goals", [])
+    if isinstance(raw_chosen, str):
+        raw_chosen = [raw_chosen]
+    if not isinstance(raw_chosen, list):
+        print("[AGENT] Unexpected format for chosen_goals; returning empty list.")
+        return []
 
-    if chosen not in candidate_goals:
-        print("[AGENT] Chosen goal not in candidate list, falling back to first candidate.")
-        return candidate_goals[0]
+    chosen_list = []
+    for goal in raw_chosen:
+        if isinstance(goal, str) and goal.strip() in candidate_goals:
+            chosen_list.append(goal.strip())
 
-    return chosen
+    return chosen_list
 
 
 def classify_goal_mode(goal: str) -> str:
     """
-    Convert goal into one of:
+    Convert a single goal into one of:
     - MONITOR
     - EXECUTE
     - MONITOR_EXECUTE
     - MONITOR_INFORM
     """
-    prompt = {
-        "role": "user",
-        "parts": [
-            "You are a goal interpreter for a backend orchestration AI.",
-            "You will receive a single human-written goal.",
-            "",
-            "You must classify it into exactly one of these modes:",
-            "- MONITOR",
-            "- EXECUTE",
-            "- MONITOR_EXECUTE",
-            "- MONITOR_INFORM",
-            "",
-            "Examples:",
-            "- 'Monitor all sensor states' -> MONITOR",
-            "- 'Change all Warning States to RED' -> EXECUTE",
-            "- 'Check for sensor gap and if exist, change warning state to red' -> MONITOR_EXECUTE",
-            "- 'Monitor tracks and notify me' -> MONITOR_INFORM",
-            "",
-            "Return ONLY the mode name.",
-            "",
-            "Goal:",
-            goal,
-        ],
-    }
+    prompt = (
+        "You are a goal interpreter for a backend orchestration AI.\n"
+        "Classify the provided goal into exactly one of: MONITOR, EXECUTE, MONITOR_EXECUTE, MONITOR_INFORM.\n\n"
+        "Examples:\n"
+        "- 'Monitor all sensor states' -> MONITOR\n"
+        "- 'Change all Warning States to RED' -> EXECUTE\n"
+        "- 'Check for sensor gap and if exist, change warning state to red' -> MONITOR_EXECUTE\n"
+        "- 'Monitor tracks and notify me' -> MONITOR_INFORM\n\n"
+        f"Goal: {goal}\n"
+        "Return ONLY the mode name."
+    )
 
-    response = llm.generate_content(prompt)
-    mode = response.text.strip().upper()
+    response = llm.invoke(prompt)
+    mode = (response.content if isinstance(response.content, str) else str(response.content)).strip().upper()
 
     valid = {"MONITOR", "EXECUTE", "MONITOR_EXECUTE", "MONITOR_INFORM"}
     if mode not in valid:
@@ -110,3 +89,11 @@ def classify_goal_mode(goal: str) -> str:
         return "MONITOR"
 
     return mode
+
+
+def classify_goal_modes(goals: List[str]) -> List[str]:
+    """Classify multiple goals, preserving order."""
+    modes: List[str] = []
+    for goal in goals:
+        modes.append(classify_goal_mode(goal))
+    return modes

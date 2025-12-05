@@ -1,101 +1,120 @@
-from typing import Dict, Any, List
 import json
-from mqttPayloadSchema import BaseMessage
-from tools import TOOLS
+from typing import Any, Dict, List
+
+from langchain_core.messages import HumanMessage, SystemMessage
+from langgraph.prebuilt import create_agent
+
+from helper import extract_json_object
 from llm import llm
-from selectGoal import select_best_goal_for_message, classify_goal_mode
-from chooseToolCall import plan_tool_calls_with_gemini
-
-# Collate tool calls and execute
-
-def execute_tool_calls(tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    results = []
-    for call in tool_calls:
-        tool_name = call.get("tool")
-        args = call.get("args", {})
-        print(f"[AGENT] Planned tool: {tool_name} with args {args}")
-
-        tdef = TOOLS.get(tool_name)
-        if not tdef:
-            print(f"[AGENT] Unknown tool '{tool_name}', skipping.")
-            results.append(
-                {"tool": tool_name, "args": args, "result": {"error": f"Unknown tool '{tool_name}'"}}
-            )
-            continue
-
-        try:
-            result = tdef.fn(**args)
-            results.append({"tool": tool_name, "args": args, "result": result})
-        except TypeError as e:
-            print(f"[AGENT] Argument error for tool '{tool_name}': {e}")
-            results.append({"tool": tool_name, "args": args, "result": {"error": f"Argument error: {e}"}})
-        except Exception as e:
-            print(f"[AGENT] Exception while executing '{tool_name}': {e}")
-            results.append({"tool": tool_name, "args": args, "result": {"error": f"Execution error: {e}"}})
-
-    return results
+from mqttPayloadSchema import BaseMessage
+from tools import (
+    TOOLS,
+    call_dss_tool,
+    check_sensor_gap_tool,
+    notify_tool,
+)
 
 
-# Summarise results for demo purpose
+# LangChain tool wrappers so LangGraph can route tool calls automatically
+def _wrap_tool(fn, *, name: str, description: str):
+    from langchain_core.tools import tool
 
-def summarize_run_with_gemini(base_msg: BaseMessage, goals: List[str], tool_results: List[Dict[str, Any]]) -> str:
+    @tool(name=name, description=description)
+    def _inner(**kwargs):
+        return fn(**kwargs)
+
+    return _inner
+
+
+wrapped_tools = [
+    _wrap_tool(
+        check_sensor_gap_tool,
+        name="check_sensor_gap_tool",
+        description=TOOLS["check_sensor_gap_tool"].description,
+    ),
+    _wrap_tool(
+        call_dss_tool,
+        name="call_dss_tool",
+        description=TOOLS["call_dss_tool"].description,
+    ),
+    _wrap_tool(
+        notify_tool,
+        name="notify_tool",
+        description=TOOLS["notify_tool"].description,
+    ),
+]
+
+# Build a reusable LangGraph agent capable of tool-calling
+_agent = create_agent(llm, tools=wrapped_tools)
+
+
+def _render_payload(base_msg: BaseMessage) -> str:
     payload_dict = {
         "type": base_msg.type,
         "action": base_msg.action,
         "userId": base_msg.userId,
-        # "correlationId": base_msg.correlationId,
         "data": base_msg.data,
     }
-
-    prompt = {
-        "role": "user",
-        "parts": [
-            "You are summarizing the result of a backend orchestration run.",
-            "",
-            "Original JSON payload:",
-            json.dumps(payload_dict, indent=2),
-            "",
-            "Goals for this run:",
-            json.dumps(goals, indent=2),
-            "",
-            "Tool calls and results (as JSON):",
-            json.dumps(tool_results, indent=2),
-            "",
-            "In a concise paragraph:",
-            "- Explain which tools were called and why.",
-            "- Mention any important results or errors.",
-            "- Mention if any goals Fcould not be satisfied due to missing data.",
-        ],
-    }
-
-    response = llm.generate_content(prompt)
-    return response.text
+    return json.dumps(payload_dict, indent=2)
 
 
-# Logic for handling message
+def _extract_text(content: Any) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(str(part) for part in content)
+    return str(content)
+
 
 def run_agent_for_message(base_msg: BaseMessage, candidate_goals: List[str]) -> str:
     """
-    Pipeline for each MQTT message:
-    - Select best goal from candidate_goals
-    - Classify goal into mode
-    - Plan tools
-    - Execute
-    - Summarize
+    Agentic pipeline implemented with LangGraph's create_agent helper.
+    The agent chooses zero, one, or multiple goals, decides goal modes,
+    calls tools, and returns a concise textual summary.
     """
-    chosen_goal = select_best_goal_for_message(base_msg, candidate_goals)
-    print(f"[AGENT] Chosen goal: {chosen_goal}")
 
-    goal_mode = classify_goal_mode(chosen_goal)
-    print(f"[AGENT] Goal mode: {goal_mode}")
+    if not candidate_goals:
+        raise ValueError("candidate_goals must not be empty")
 
-    tool_calls = plan_tool_calls_with_gemini(base_msg, goal_mode, chosen_goal)
-    tool_results = execute_tool_calls(tool_calls)
+    payload_str = _render_payload(base_msg)
+    goals_str = json.dumps(candidate_goals, indent=2)
 
-    summary = summarize_run_with_gemini(
-        base_msg,
-        goals=[chosen_goal, f"MODE={goal_mode}"],
-        tool_results=tool_results,
+    system_msg = SystemMessage(
+        content=(
+            "You are an orchestration agent that must ground every action in the "
+            "incoming MQTT payload. Choose zero, one, or multiple goals from the list, "
+            "infer a goal mode (MONITOR, EXECUTE, MONITOR_EXECUTE, MONITOR_INFORM) for each, "
+            "and use the available tools to satisfy them. Prefer monitoring/analysis "
+            "before execution when uncertain. Avoid inventing data; if required "
+            "fields are missing, explain the gap instead of hallucinating. If no goals "
+            "apply, respond with an empty selection and refrain from tool calls."
+        )
     )
-    return summary
 
+    human_msg = HumanMessage(
+        content=(
+            "=== PAYLOAD ===\n"
+            f"{payload_str}\n\n"
+            "=== CANDIDATE GOALS ===\n"
+            f"{goals_str}\n\n"
+            "Decide which goals to pursue (including possibly none), determine a mode for each, "
+            "and call tools as needed. End with a final assistant message containing a short summary "
+            "plus a JSON block with keys: chosen_goals (array), goal_modes (object mapping goal->mode), "
+            "and results (any structured data)."
+        )
+    )
+
+    print("[AGENT] Running LangGraph agent with create_agent...")
+    result = _agent.invoke({"messages": [system_msg, human_msg]})
+
+    messages = result.get("messages", [])
+    final_message = messages[-1] if messages else None
+    text_content = _extract_text(getattr(final_message, "content", ""))
+
+    # If the model embedded a JSON summary, surface it cleanly for logs
+    extracted = extract_json_object(text_content)
+    if extracted:
+        print("[AGENT] Extracted structured summary:")
+        print(json.dumps(extracted, indent=2))
+
+    return text_content
