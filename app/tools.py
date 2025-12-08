@@ -2,6 +2,7 @@ import requests
 from typing import Dict, Any, Callable
 import os
 
+# REPLACE
 BACKEND_BASE_URL = os.environ.get("BACKEND_BASE_URL", "http://localhost:5001/demo")
 COMMON_HEADERS = {"X-Service-Name": "mqtt-agent"}
 
@@ -9,7 +10,7 @@ COMMON_HEADERS = {"X-Service-Name": "mqtt-agent"}
 def check_sensor_gap_tool(user_id: str, incident_id: str) -> Dict[str, Any]:
     """
     Check sensor coverage and detect any sensor gaps in breach scenarios and user.
-    Use this when you need to assess how well sensors cover an incident.
+    Used to assess whether sensors cover an incident.
     """
     url = f"{BACKEND_BASE_URL}"
     payload = {
@@ -41,8 +42,8 @@ def call_dss_tool(user_id: str, scenario: str) -> Dict[str, Any]:
 
 def notify_tool(user_id: str, message: str) -> Dict[str, Any]:
     """
-    Send a notification or log entry associated with a specific user.
-    Use this when you need to log or notify about what was done.
+    Send a notification associated with a specific user.
+    Used when required to log or notify about what was done or a specific event.
     """
     url = f"{BACKEND_BASE_URL}"
     payload = {

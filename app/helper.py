@@ -1,38 +1,52 @@
-from typing import Dict, Any
-import json
-
-# def extract_json_object(text: str) -> Dict[str, Any]:
-#     """
-#     Extract a JSON object from a Gemini text response.
-#     """
-#     text = text.strip()
-#     if text.startswith("```"):
-#         text = text.strip("`")
-#         if text.lower().startswith("json"):
-#             text = text[4:].strip()
-
-#     try:
-#         return json.loads(text)
-#     except json.JSONDecodeError as e:
-#         raise ValueError(f"Failed to parse JSON from Gemini response: {e}\nRaw text:\n{text}")
-
 import json
 from typing import Any, Dict
+from langchain_core.tools import tool
+from mqttPayloadSchema import BaseMessage
 
 
+def _render_payload(base_msg: BaseMessage) -> str:
+    payload_dict = {
+        "type": base_msg.type,
+        "action": base_msg.action,
+        "userId": base_msg.userId,
+        "data": base_msg.data,
+    }
+    return json.dumps(payload_dict, indent=2)
+
+
+def _wrap_tool(fn, *, name: str, description: str):
+    @tool(name, description=description)
+    def _inner(**kwargs):
+        if "kwargs" in kwargs and isinstance(kwargs["kwargs"], dict):
+            nested = kwargs.pop("kwargs")
+            kwargs.update(nested)
+
+        return fn(**kwargs)
+
+    return _inner
+
+
+# Helper to extract text from AI Response
+def _extract_text(content: Any) -> str:
+    """
+    Handle string and list of strings from agent response
+    """
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(str(part) for part in content)
+    return str(content)
+
+
+# Helper to extract JSON object from LLM response
 def extract_json_object(text: str) -> Dict[str, Any]:
     """
-    Extract a JSON object from an LLM response.
-    Handles:
-    - pure JSON
-    - ```json ... ``` fenced blocks
-    - ``` ... ``` generic fenced blocks
-    - extra prose before/after JSON
+    Extract JSON object from LLM response.
     """
     original_text = text
     text = text.strip()
 
-    # 1) Try to find a ```json fenced block first
+    # Method 1 to Parse out chosen_goals from JSON
     fence_start = text.lower().find("```json")
     if fence_start != -1:
         fence_end = text.find("```", fence_start + 7)
@@ -45,7 +59,7 @@ def extract_json_object(text: str) -> Dict[str, Any]:
                     f"Failed to parse JSON from fenced ```json block: {e}\nRaw block:\n{json_block}"
                 )
 
-    # 2) Fallback: any ``` fenced block (no language tag)
+    # Method 2 to Parse out chosen_goals from JSON
     fence_start = text.find("```")
     if fence_start != -1:
         fence_end = text.find("```", fence_start + 3)
@@ -54,10 +68,9 @@ def extract_json_object(text: str) -> Dict[str, Any]:
             try:
                 return json.loads(json_block)
             except json.JSONDecodeError as e:
-                # continue to next strategy instead of failing immediately
                 pass
 
-    # 3) Fallback: find first '{' and last '}' and try that substring
+    # If no fenced block, find curly braces
     first_brace = text.find("{")
     last_brace = text.rfind("}")
     if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
@@ -68,7 +81,7 @@ def extract_json_object(text: str) -> Dict[str, Any]:
             # fall through to final error
             pass
 
-    # 4) Last resort: try to parse the whole thing (maybe it was already JSON)
+    # If entire response is a JSON
     try:
         return json.loads(text)
     except json.JSONDecodeError as e:

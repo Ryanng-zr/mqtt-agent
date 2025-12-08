@@ -1,0 +1,12 @@
+{
+  "type": "COMMAND",
+  "action": "AIR_TRACK_UPDATE",
+  "userId": "U-101",
+  "data": {
+    "trackId": "T-99",
+    "speed": 850,
+    "altitude": 32000,
+    "incidentId": "INC-123",
+    "scenario": "Breach"
+  }
+}

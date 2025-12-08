@@ -6,6 +6,7 @@ from mqttPayloadSchema import BaseMessage
 from helper import extract_json_object
 
 
+# Stopped using
 def select_best_goal_for_message(
     base_msg: BaseMessage, candidate_goals: List[str]
 ) -> List[str]:
@@ -103,7 +104,7 @@ def classify_goal_mode(goal: str) -> str:
 
 
 def classify_goal_modes(goals: List[str]) -> List[str]:
-    """Classify multiple goals, preserving order."""
+    """Classify multiple goals"""
     modes: List[str] = []
     for goal in goals:
         modes.append(classify_goal_mode(goal))

@@ -1,11 +1,10 @@
 import json
-from typing import Any, List
+from typing import List
 
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_core.tools import tool
 from langchain.agents import create_agent
 
-from helper import extract_json_object
+from helper import extract_json_object, _extract_text, _wrap_tool, _render_payload
 from llm import llm
 from mqttPayloadSchema import BaseMessage
 from tools import (
@@ -15,19 +14,7 @@ from tools import (
     notify_tool,
 )
 
-
-def _wrap_tool(fn, *, name: str, description: str):
-    @tool(name, description=description)
-    def _inner(**kwargs):
-        if "kwargs" in kwargs and isinstance(kwargs["kwargs"], dict):
-            nested = kwargs.pop("kwargs")
-            kwargs.update(nested)
-
-        return fn(**kwargs)
-
-    return _inner
-
-
+# Tools to be retrieved from SWAGGER JSON from product teams
 wrapped_tools = [
     _wrap_tool(
         check_sensor_gap_tool,
@@ -46,45 +33,26 @@ wrapped_tools = [
     ),
 ]
 
+# Main Agent to run tool calls
 _agent = create_agent(llm, tools=wrapped_tools)
-
-
-def _render_payload(base_msg: BaseMessage) -> str:
-    payload_dict = {
-        "type": base_msg.type,
-        "action": base_msg.action,
-        "userId": base_msg.userId,
-        "data": base_msg.data,
-    }
-    return json.dumps(payload_dict, indent=2)
-
-
-# Extract Text Helper from AI Response
-def _extract_text(content: Any) -> str:
-    if isinstance(content, str):
-        return content
-    if isinstance(content, list):
-        return "".join(str(part) for part in content)
-    return str(content)
 
 
 def run_agent_for_message(base_msg: BaseMessage, candidate_goals: List[str]) -> str:
     """
-    Agentic pipeline implemented with LangGraph's create_agent helper.
-    The agent chooses zero, one, or multiple goals, decides goal modes,
-    calls tools, and returns a concise textual summary.
+    Choose zero, one, or multiple goals, classify goals into goal modes,
+    then execute tools, and return a summary.
     """
-
+    # throw error if no goals
     if not candidate_goals:
         raise ValueError("candidate_goals must not be empty")
 
-    # Internalise the payload
+    # Deconstruct the payload into a string
     payload_str = _render_payload(base_msg)
 
-    # Internalise the candidate goals
+    # Deconstruct the goals into a string
     goals_str = json.dumps(candidate_goals, indent=2)
 
-    # Construct system message to determine GOAL SELECTION
+    # Main Prompt to determine GOAL SELECTION
     system_msg = SystemMessage(
         content=(
             "You are an orchestration agent that must ground every action in the "
@@ -97,7 +65,7 @@ def run_agent_for_message(base_msg: BaseMessage, candidate_goals: List[str]) -> 
         )
     )
 
-    # Add payload and goals to human message
+    # Add payload and goals
     human_msg = HumanMessage(
         content=(
             "=== PAYLOAD ===\n"
@@ -116,9 +84,10 @@ def run_agent_for_message(base_msg: BaseMessage, candidate_goals: List[str]) -> 
 
     messages = result.get("messages", [])
     final_message = messages[-1] if messages else None
+    # Extract text content from final message
     text_content = _extract_text(getattr(final_message, "content", ""))
 
-    # If the model embedded a JSON summary, surface it cleanly for logs
+    # Extract chosen_goals from final message
     extracted = extract_json_object(text_content)
     if extracted:
         print("[AGENT] Extracted structured summary:")

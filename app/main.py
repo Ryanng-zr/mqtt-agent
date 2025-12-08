@@ -6,7 +6,6 @@ from pydantic import ValidationError
 import paho.mqtt.client as mqtt
 
 # MQTT integration
-
 MQTT_BROKER = os.environ.get("MQTT_BROKER", "localhost")
 MQTT_PORT = int(os.environ.get("MQTT_PORT", "1883"))
 MQTT_CLIENT_ID = os.environ.get("MQTT_CLIENT_ID", "gemini-mqtt-agent")
@@ -14,7 +13,7 @@ MQTT_CLIENT_ID = os.environ.get("MQTT_CLIENT_ID", "gemini-mqtt-agent")
 # Example air track topic
 MQTT_TOPIC_AIR_TRACKS = os.environ.get("MQTT_TOPIC_AIR_TRACKS", "sensors/air_tracks")
 
-# Goals for demo purpose
+# Goals to be given and set by product teams
 GOALS = [
     "Monitor all air track states",
     "Trigger DSS for target X",
